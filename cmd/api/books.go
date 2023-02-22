@@ -2,6 +2,7 @@ package main
 
 import (
 	"Books/internal/data"
+	"Books/internal/validator"
 	"fmt"
 	"net/http"
 	"time"
@@ -24,7 +25,23 @@ func (app *application) createBookHandler(w http.ResponseWriter, r *http.Request
 		app.badRequestResponse(w, r, err)
 		return
 	}
+	book := &data.Book{
+		Title:    input.Title,
+		Authors:  input.Authors,
+		Rating:   input.Rating,
+		ISBN:     input.ISBN,
+		ISBN13:   input.ISBN13,
+		Language: input.Language,
+		Genres:   input.Genres,
+		Pages:    input.Pages,
+	}
 
+	v := validator.New()
+
+	if data.ValidateBook(v, book); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
 	fmt.Fprintf(w, "%+v\n", input)
 }
 
@@ -35,7 +52,7 @@ func (app *application) showBookHandler(w http.ResponseWriter, r *http.Request) 
 		app.notFoundResponse(w, r)
 	}
 
-	books := data.Books{
+	books := data.Book{
 		ID:        id,
 		Title:     "Harry Potter",
 		Authors:   "J.K. Rowling",
