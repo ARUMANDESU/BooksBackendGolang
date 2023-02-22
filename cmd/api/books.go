@@ -1,8 +1,10 @@
 package main
 
 import (
+	"Books/internal/data"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 func (app *application) createBookHandler(w http.ResponseWriter, r *http.Request) {
@@ -13,9 +15,23 @@ func (app *application) showBookHandler(w http.ResponseWriter, r *http.Request) 
 
 	id, err := app.readIDParam(r)
 	if err != nil {
-		http.NotFound(w, r)
-		return
+		app.notFoundResponse(w, r)
 	}
 
-	fmt.Fprintf(w, "show the details of movie %d\n", id)
+	books := data.Books{
+		ID:              id,
+		Title:           "Harry Potter",
+		Authors:         "J.K. Rowling",
+		Rating:          4.57,
+		ISBN:            "0439785960",
+		ISBN13:          "9780439785969",
+		Language:        "",
+		Pages:           652,
+		PublicationDate: time.Now(),
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"book": books}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
 }
