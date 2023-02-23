@@ -16,6 +16,7 @@ type Book struct {
 	Genres    []string  `json:"genres,omitempty"`
 	Pages     Pages     `json:"pages,omitempty,string"`
 	CreatedAt time.Time `json:"-"`
+	Version   int32     `json:"version"`
 }
 
 func ValidateBook(v *validator.Validator, book *Book) {
