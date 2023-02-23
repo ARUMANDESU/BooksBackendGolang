@@ -2,6 +2,7 @@ package data
 
 import (
 	"Books/internal/validator"
+	"context"
 	"database/sql"
 	"errors"
 	"github.com/lib/pq"
@@ -34,6 +35,7 @@ func ValidateBook(v *validator.Validator, book *Book) {
 	v.Check(book.Pages != 0, "pages", "must be provided")
 	v.Check(book.Pages > 0, "pages", "must be a positive integer")
 	v.Check(book.Genres != nil, "genres", "must be provided")
+	v.Check(book.Language != "", "language", "must be provided")
 	v.Check(len(book.Genres) >= 1, "genres", "must contain at least 1 genre")
 	v.Check(len(book.Genres) <= 5, "genres", "must not contain more than 5 genres")
 	v.Check(validator.Unique(book.Genres), "genres", "must not contain duplicate values")
@@ -50,7 +52,9 @@ func (b BookModel) Insert(book *Book) error {
 			RETURNING id, created_at, version`
 
 	args := []any{book.Title, book.Authors, book.Rating, book.Pages, pq.Array(book.Genres), book.ISBN, book.ISBN13, book.Language}
-	return b.DB.QueryRow(query, args...).Scan(&book.ID, &book.CreatedAt, &book.Version)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	return b.DB.QueryRowContext(ctx, query, args...).Scan(&book.ID, &book.CreatedAt, &book.Version)
 }
 
 func (b BookModel) Get(id int64) (*Book, error) {
@@ -59,12 +63,15 @@ func (b BookModel) Get(id int64) (*Book, error) {
 	}
 
 	query := `
-			SELECT id, created_at, title, authors,rating, pages, genres,isbn,isbn13,language,version
+			SELECT  id, created_at, title, authors,rating, pages, genres,isbn,isbn13,language,version
 			FROM books
 			WHERE id = $1`
 
 	var book Book
-	err := b.DB.QueryRow(query, id).Scan(
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+
+	defer cancel()
+	err := b.DB.QueryRowContext(ctx, query, id).Scan(
 		&book.ID,
 		&book.CreatedAt,
 		&book.Title,
@@ -92,7 +99,7 @@ func (b BookModel) Update(book *Book) error {
 	query := `
 			UPDATE books
 			SET title = $1, authors = $2, pages = $3, rating=$4, genres = $5, isbn=$6, isbn13=$7, language=$8, version = version + 1
-			WHERE id = $9
+			WHERE id = $9 and version = $10
 			RETURNING version`
 
 	args := []any{
@@ -105,9 +112,22 @@ func (b BookModel) Update(book *Book) error {
 		book.ISBN13,
 		book.Language,
 		book.ID,
+		book.Version,
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
-	return b.DB.QueryRow(query, args...).Scan(&book.Version)
+	err := b.DB.QueryRowContext(ctx, query, args...).Scan(&book.Version)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrEditConflict
+		default:
+			return err
+
+		}
+	}
+	return nil
 }
 
 func (b BookModel) Delete(id int64) error {
@@ -119,7 +139,9 @@ func (b BookModel) Delete(id int64) error {
 			DELETE FROM books
 			WHERE id = $1`
 
-	result, err := b.DB.Exec(query, id)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	result, err := b.DB.ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}

@@ -99,14 +99,14 @@ func (app *application) updateBookHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 	var input struct {
-		Title    string     `json:"title"`
-		Authors  string     `json:"authors"`
-		ISBN     string     `json:"ISBN"`
-		ISBN13   string     `json:"ISBN13"`
-		Language string     `json:"language"`
-		Genres   []string   `json:"genres"`
-		Rating   float64    `json:"rating"`
-		Pages    data.Pages `json:"pages"`
+		Title    *string     `json:"title"`
+		Authors  *string     `json:"authors"`
+		ISBN     *string     `json:"ISBN"`
+		ISBN13   *string     `json:"ISBN13"`
+		Language *string     `json:"language"`
+		Genres   []string    `json:"genres"`
+		Rating   *float64    `json:"rating"`
+		Pages    *data.Pages `json:"pages"`
 	}
 
 	err = app.readJSON(w, r, &input)
@@ -115,14 +115,30 @@ func (app *application) updateBookHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	book.Title = input.Title
-	book.Authors = input.Authors
-	book.Rating = input.Rating
-	book.ISBN = input.ISBN
-	book.ISBN13 = input.ISBN13
-	book.Language = input.Language
-	book.Genres = input.Genres
-	book.Pages = input.Pages
+	if input.Title != nil {
+		book.Title = *input.Title
+	}
+	if input.Authors != nil {
+		book.Authors = *input.Authors
+	}
+	if input.Rating != nil {
+		book.Rating = *input.Rating
+	}
+	if input.ISBN != nil {
+		book.ISBN = *input.ISBN
+	}
+	if input.ISBN13 != nil {
+		book.ISBN13 = *input.ISBN13
+	}
+	if input.Language != nil {
+		book.Language = *input.Language
+	}
+	if input.Genres != nil {
+		book.Genres = input.Genres
+	}
+	if input.Pages != nil {
+		book.Pages = *input.Pages
+	}
 
 	v := validator.New()
 	if data.ValidateBook(v, book); !v.Valid() {
@@ -132,7 +148,12 @@ func (app *application) updateBookHandler(w http.ResponseWriter, r *http.Request
 
 	err = app.models.Books.Update(book)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			app.editConflictResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
 		return
 	}
 
