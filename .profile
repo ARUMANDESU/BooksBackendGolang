@@ -1,1 +1,0 @@
-export BOOKS_DB_DSN='postgres://books:pa55word@localhost/books?sslmode=disable'
