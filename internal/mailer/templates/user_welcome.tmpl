@@ -2,7 +2,10 @@
 {{define "plainBody"}}
 Hi,
 Thanks for signing up for a Books account. We're excited to have you on board!
-For future reference, your user ID number is {{.ID}}.
+For future reference, your user ID number is {{.userID}}.
+Please click link to activate your account:
+{{.backendUrl}}/v1/users/activated/?token={{.activationToken}}
+Please note that this is a one-time use token and it will expire in 3 days.
 Thanks,
 The Books Team
 {{end}}
@@ -16,7 +19,10 @@ The Books Team
 <body>
 <p>Hi,</p>
 <p>Thanks for signing up for a Books account. We're excited to have you on board!</p>
-<p>For future reference, your user ID number is {{.ID}}.</p>
+<p>For future reference, your user ID number is {{.userID}}.</p>
+<p>Please click link to activate your account:</p>
+<a href="{{.backendUrl}}/v1/users/activated/?token={{.activationToken}}" >{{.backendUrl}}/v1/users/activated/?token={{.activationToken}}</a>
+<p>Please note that this is a one-time use token and it will expire in 3 days.</p>
 <p>Thanks,</p>
 <p>The Books Team</p>
 </body>
