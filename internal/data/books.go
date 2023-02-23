@@ -2,6 +2,9 @@ package data
 
 import (
 	"Books/internal/validator"
+	"database/sql"
+	"errors"
+	"github.com/lib/pq"
 	"time"
 )
 
@@ -34,4 +37,100 @@ func ValidateBook(v *validator.Validator, book *Book) {
 	v.Check(len(book.Genres) >= 1, "genres", "must contain at least 1 genre")
 	v.Check(len(book.Genres) <= 5, "genres", "must not contain more than 5 genres")
 	v.Check(validator.Unique(book.Genres), "genres", "must not contain duplicate values")
+}
+
+type BookModel struct {
+	DB *sql.DB
+}
+
+func (b BookModel) Insert(book *Book) error {
+	query := `
+			INSERT INTO books (title, authors,rating, pages, genres,isbn,isbn13,language)
+			VALUES ($1, $2, $3, $4, $5,$6,$7,$8)
+			RETURNING id, created_at, version`
+
+	args := []any{book.Title, book.Authors, book.Rating, book.Pages, pq.Array(book.Genres), book.ISBN, book.ISBN13, book.Language}
+	return b.DB.QueryRow(query, args...).Scan(&book.ID, &book.CreatedAt, &book.Version)
+}
+
+func (b BookModel) Get(id int64) (*Book, error) {
+	if id < 1 {
+		return nil, ErrRecordNotFound
+	}
+
+	query := `
+			SELECT id, created_at, title, authors,rating, pages, genres,isbn,isbn13,language,version
+			FROM books
+			WHERE id = $1`
+
+	var book Book
+	err := b.DB.QueryRow(query, id).Scan(
+		&book.ID,
+		&book.CreatedAt,
+		&book.Title,
+		&book.Authors,
+		&book.Rating,
+		&book.Pages,
+		pq.Array(&book.Genres),
+		&book.ISBN,
+		&book.ISBN13,
+		&book.Language,
+		&book.Version,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+	return &book, nil
+}
+
+func (b BookModel) Update(book *Book) error {
+	query := `
+			UPDATE books
+			SET title = $1, authors = $2, pages = $3, rating=$4, genres = $5, isbn=$6, isbn13=$7, language=$8, version = version + 1
+			WHERE id = $9
+			RETURNING version`
+
+	args := []any{
+		book.Title,
+		book.Authors,
+		book.Pages,
+		book.Rating,
+		pq.Array(book.Genres),
+		book.ISBN,
+		book.ISBN13,
+		book.Language,
+		book.ID,
+	}
+
+	return b.DB.QueryRow(query, args...).Scan(&book.Version)
+}
+
+func (b BookModel) Delete(id int64) error {
+	if id < 1 {
+		return ErrRecordNotFound
+	}
+
+	query := `
+			DELETE FROM books
+			WHERE id = $1`
+
+	result, err := b.DB.Exec(query, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return ErrRecordNotFound
+	}
+	return nil
 }
